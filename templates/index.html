@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TIR+ | Calculadora Inteligente de Tasa Interna de Retorno</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+  <header class="navbar">
+    <div class="navbar__brand">
+      <span class="navbar__logo">TIR<span class="navbar__logo-plus">+</span></span>
+    </div>
+    <nav class="navbar__tabs">
+      <button class="tab-btn is-active" data-tab="inicio">Inicio</button>
+      <button class="tab-btn" data-tab="resolucion">Resolución</button>
+      <button class="tab-btn" data-tab="solucion">Solución</button>
+      <button class="tab-btn" data-tab="graficos">Gráficos</button>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- ========================= TAB: INICIO ========================= -->
+    <section id="tab-inicio" class="tab-panel is-active">
+      <div class="hero">
+        <div class="hero__text">
+          <h1>Calculadora Inteligente<br>de Tasa Interna de Retorno</h1>
+          <p>
+            La TIR es la tasa de descuento que iguala el VAN de un flujo de
+            caja a cero. Sube la foto de tu ejercicio, dibújalo a mano o
+            escribe el enunciado: la IA construye el flujo de caja y el
+            motor matemático resuelve la TIR paso a paso, con sustento
+            teórico, clasificación de la inversión y gráficos.
+          </p>
+          <button class="btn btn--primary" id="btn-comenzar">Comenzar a resolver</button>
+        </div>
+        <div class="hero__diagram" aria-hidden="true">
+          <svg viewBox="0 0 320 200" xmlns="http://www.w3.org/2000/svg">
+            <line x1="20" y1="160" x2="300" y2="160" stroke="var(--c-white)" stroke-width="2"/>
+            <polygon points="300,160 290,154 290,166" fill="var(--c-white)"/>
+            <g stroke="var(--c-accent)" stroke-width="3" fill="none">
+              <path d="M60 160 L60 60" />
+              <path d="M140 160 L140 110" />
+              <path d="M220 160 L220 85" />
+              <path d="M280 160 L280 40" />
+            </g>
+            <circle cx="60" cy="60" r="4" fill="var(--c-accent)"/>
+            <circle cx="140" cy="110" r="4" fill="var(--c-accent)"/>
+            <circle cx="220" cy="85" r="4" fill="var(--c-accent)"/>
+            <circle cx="280" cy="40" r="4" fill="var(--c-accent)"/>
+            <text x="55" y="178" fill="var(--c-white-dim)" font-size="11">t0</text>
+            <text x="135" y="178" fill="var(--c-white-dim)" font-size="11">t1</text>
+            <text x="215" y="178" fill="var(--c-white-dim)" font-size="11">t2</text>
+            <text x="273" y="178" fill="var(--c-white-dim)" font-size="11">t3</text>
+          </svg>
+        </div>
+      </div>
+
+      <div class="info-cards">
+        <article class="info-card">
+          <h3>1. Lectura inteligente</h3>
+          <p>Gemini interpreta fotos del libro, enunciados escritos o bocetos de diagramas de flujo hechos a mano.</p>
+        </article>
+        <article class="info-card">
+          <h3>2. Cálculo exacto</h3>
+          <p>NumPy y SciPy resuelven el polinomio del VAN: nunca se delega la aritmética a la IA.</p>
+        </article>
+        <article class="info-card">
+          <h3>3. Desarrollo paso a paso</h3>
+          <p>Fundamento teórico, desarrollo y respuesta final, en el formato que exige la cátedra.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ======================= TAB: RESOLUCIÓN ======================= -->
+    <section id="tab-resolucion" class="tab-panel">
+      <h2>Ingreso de datos</h2>
+      <p class="section-subtitle">Usa cualquiera de las tres vías. Puedes combinar texto + imagen.</p>
+
+      <div class="input-grid">
+        <div class="input-card">
+          <h3>1. Enunciado / texto</h3>
+          <textarea id="input-texto" rows="9" placeholder="Pega o escribe aquí el enunciado del problema..."></textarea>
+        </div>
+
+        <div class="input-card">
+          <h3>2. Adjuntar imagen</h3>
+          <label class="file-drop" for="input-imagen">
+            <span id="file-drop-label">Subir foto del problema</span>
+            <input type="file" id="input-imagen" accept="image/*" hidden>
+          </label>
+          <img id="preview-imagen" class="preview-imagen" hidden>
+        </div>
+
+        <div class="input-card">
+          <h3>3. Entrada manuscrita (canvas)</h3>
+          <canvas id="canvas-dibujo" width="320" height="220"></canvas>
+          <div class="canvas-actions">
+            <button class="btn btn--ghost" id="btn-limpiar-canvas">Limpiar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label for="input-tmar">TMAR (%) <span class="hint">(déjalo vacío si el problema no la especifica)</span></label>
+        <input type="number" id="input-tmar" step="0.01" placeholder="ej. 13">
+      </div>
+
+      <button class="btn btn--primary btn--wide" id="btn-analizar">Analizar problema con IA</button>
+      <p id="analizar-error" class="error-msg" hidden></p>
+    </section>
+
+    <!-- ========================= TAB: SOLUCIÓN ========================= -->
+    <section id="tab-solucion" class="tab-panel">
+      <h2>Datos extraídos</h2>
+      <div id="datos-extraidos" class="card">
+        <p class="empty-state">Todavía no analizaste ningún problema. Ve a la pestaña «Resolución».</p>
+      </div>
+
+      <div class="form-row" id="fila-resolver" hidden>
+        <button class="btn btn--primary" id="btn-resolver">Resolver con estos datos</button>
+      </div>
+
+      <h2>Solución detallada</h2>
+      <div id="solucion-detallada" class="card">
+        <p class="empty-state">Aquí aparecerá el fundamento teórico, el desarrollo paso a paso y la respuesta final.</p>
+      </div>
+    </section>
+
+    <!-- ========================= TAB: GRÁFICOS ========================= -->
+    <section id="tab-graficos" class="tab-panel">
+      <h2>Visualización gráfica</h2>
+      <div class="graficos-grid">
+        <div class="card">
+          <h3>Diagrama de flujo de caja</h3>
+          <canvas id="chart-flujo"></canvas>
+        </div>
+        <div class="card">
+          <h3>Curva del VAN vs. tasa de descuento</h3>
+          <canvas id="chart-van"></canvas>
+        </div>
+      </div>
+      <p id="graficos-empty" class="empty-state">Resuelve un problema para ver sus gráficos aquí.</p>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <p>TIR+ · Proyecto académico — Sistemas Económicos, Ing. de Sistemas, UMSS</p>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.3/chart.umd.min.js"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
