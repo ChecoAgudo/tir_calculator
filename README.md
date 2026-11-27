@@ -5,7 +5,7 @@ Unidad 7, Análisis de la Tasa de Rendimiento.
 
 Resuelve problemas de VAN/TIR (simples, mixtos y de análisis incremental
 entre alternativas) a partir de **texto, una foto del enunciado o un
-boceto dibujado a mano**. Gemini (IA de Google) lee el problema y arma la
+boceto dibujado a mano**. Ollama ejecuta un modelo de visión local que lee el problema y arma la
 tabla de flujos de caja; todo el cálculo matemático (VAN, TIR, regla de
 signos de Descartes, análisis incremental) lo hace Python puro con
 NumPy/SciPy — así la IA nunca "inventa" un número final.
@@ -18,7 +18,7 @@ NumPy/SciPy — así la IA nunca "inventa" un número final.
 tir_calculator/
 ├── app.py                # Flask: rutas / API REST
 ├── solver.py              # Motor matemático: VAN, TIR, incremental, gráficos
-├── gemini_service.py       # Integración con Gemini (lee imagen/texto -> JSON)
+├── ollama_service.py       # Integración con Ollama local (lee imagen/texto -> JSON)
 ├── config.py               # Lee variables de entorno (.env)
 ├── requirements.txt
 ├── .env.example             # Plantilla de variables de entorno
@@ -30,7 +30,7 @@ tir_calculator/
 ```
 
 **Flujo de datos:**
-`Imagen/Texto/Canvas → Gemini (extrae flujos de caja en JSON) → el usuario
+`Imagen/Texto/Canvas → Ollama local (extrae flujos de caja en JSON) → el usuario
 revisa/edita los montos → solver.py calcula VAN/TIR con NumPy/SciPy →
 la interfaz muestra fundamento teórico + pasos + respuesta final + gráficos`.
 
@@ -40,18 +40,25 @@ la interfaz muestra fundamento teórico + pasos + respuesta final + gráficos`.
 
 1. **Python 3.11 o 3.12** instalado (`python3 --version` en una terminal).
 2. **Visual Studio Code** con la extensión oficial **Python** (de Microsoft) instalada.
-3. Una **API Key de Google Gemini** (gratuita, ver paso 3).
-4. Conexión a internet (Gemini y las fuentes/CDN del frontend la necesitan).
+3. **Ollama para Windows** y espacio para descargar un modelo de visión de aproximadamente 3.2 GB.
+4. Conexión a internet para instalar Ollama, descargar el modelo y cargar las fuentes/CDN del frontend.
 
 ---
 
-## 3. Obtener tu API Key de Google Gemini
+## 3. Instalar Ollama y descargar el modelo
 
-1. Entra a **https://aistudio.google.com/app/apikey** con tu cuenta de Google.
-2. Haz clic en **"Create API key"** (Crear clave de API).
-3. Copia la clave generada (empieza con algo como `AIza...`). La necesitarás en el paso 5.
+1. Descarga e instala Ollama desde **https://ollama.com/download/windows**.
+2. Abre una terminal nueva de VS Code y descarga el modelo de visión:
 
-> La capa gratuita de Gemini alcanza perfectamente para este proyecto académico.
+   ```powershell
+   ollama pull qwen2.5vl:3b
+   ```
+
+El modelo se ejecuta en tu computadora: no necesita API key, cuenta de proveedor,
+tarjeta de crédito ni cobra por consulta. El tamaño descargado del modelo es
+aproximadamente 3.2 GB. El rendimiento dependerá de la memoria y velocidad de tu PC.
+Una vez instalado, puedes hacer más de 30 consultas; no hay una cuota por petición,
+pero cada consulta consume recursos de tu computadora.
 
 ---
 
@@ -91,14 +98,14 @@ cp .env.example .env
 > manualmente: `Ctrl+Shift+P` → "Python: Select Interpreter" → elige el que
 > dice `./venv/bin/python` (o `.\venv\Scripts\python.exe` en Windows).
 
-### Edita el archivo `.env`
+### Edita el archivo `.env` (opcional)
 
-Abre el archivo `.env` que se acaba de crear y pega tu clave real:
+Ollama funciona con estos valores predeterminados, así que no necesitas una clave
+ni modificar `.env`. Si deseas configurar el servidor o el modelo, usa:
 
 ```
-GOOGLE_API_KEY=AIzaSy...tu_clave_real_aqui
-GEMINI_MODEL=gemini-2.5-flash
-FLASK_SECRET_KEY=cualquier-texto-aleatorio-largo
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen2.5vl:3b
 ```
 
 **Nunca subas el archivo `.env` a GitHub** (ya está excluido en `.gitignore`).
@@ -107,7 +114,9 @@ FLASK_SECRET_KEY=cualquier-texto-aleatorio-largo
 
 ## 6. Ejecutar el proyecto localmente
 
-Con el entorno virtual activado (deberías ver `(venv)` al inicio de la línea de la terminal):
+Abre Ollama desde el menú Inicio y déjalo ejecutándose. Confirma que el modelo
+está disponible con `ollama list`. Después, con el entorno virtual activado
+(deberías ver `(venv)` al inicio de la línea de la terminal):
 
 ```bash
 python app.py
@@ -152,65 +161,23 @@ mismo con el **canvas**: dibuja el diagrama de flujo de caja y presiona el botó
 | Síntoma | Causa probable | Solución |
 |---|---|---|
 | `ModuleNotFoundError: No module named 'flask'` | El entorno virtual no está activado | Vuelve a correr `source venv/bin/activate` (o el de Windows) antes de `python app.py` |
-| Error 422 "No se configuró GOOGLE_API_KEY" | Falta `.env` o la clave está vacía | Revisa que el archivo se llame exactamente `.env` (no `.env.txt`) y que tenga tu clave real |
+| No se pudo conectar con Ollama en `localhost:11434` | Ollama no está abierto | Abre Ollama desde el menú Inicio; si no está instalado, instálalo desde ollama.com |
+| Ollama responde que no encuentra el modelo | El modelo no se descargó | Ejecuta `ollama pull qwen2.5vl:3b` y vuelve a probar |
+| Ollama tarda mucho o Windows se queda sin memoria | El modelo es pesado para el equipo o la primera carga tarda | Cierra aplicaciones, prueba solo con texto o usa un equipo con más memoria |
 | Error 422 "No se pudo interpretar la respuesta de la IA" | La imagen es borrosa o el enunciado es ambiguo | Prueba con mejor luz/enfoque, o edita los datos extraídos manualmente en la pestaña Solución |
 | `OSError: [Errno 98] Address already in use` | El puerto 5000 ya está ocupado | Cierra el proceso anterior o cambia el puerto en la última línea de `app.py` (`port=5001`) |
 | La página carga pero los gráficos no aparecen | Sin conexión a internet (Chart.js se carga desde un CDN) | Verifica tu conexión; el proyecto necesita acceso a `cdnjs.cloudflare.com` |
 
 ---
 
-## 9. Desplegar en producción
+## 9. Uso local y despliegue
 
-### Opción recomendada: Render (más simple y estable para Flask)
-
-1. Sube el proyecto a un repositorio de **GitHub** (crea el repo y haz `git push`).
-2. Entra a **https://render.com** → **New + → Web Service** → conecta tu repositorio.
-3. Render detectará automáticamente `render.yaml`. Si te pide confirmarlo manualmente:
-   - **Build Command:** `pip install -r requirements.txt`
-   - **Start Command:** `gunicorn app:app`
-4. En la sección **Environment**, agrega las variables:
-   - `GOOGLE_API_KEY` = tu clave real
-   - `GEMINI_MODEL` = `gemini-2.5-flash`
-5. Clic en **Create Web Service**. Render te dará una URL pública (`https://tir-calculadora.onrender.com`).
-
-### Opción: PythonAnywhere
-
-1. Crea una cuenta gratuita en **https://www.pythonanywhere.com**.
-2. Sube el proyecto: pestaña **Files** → sube el `.zip` y descomprímelo
-   (o usa `git clone` desde una consola Bash de PythonAnywhere).
-3. Pestaña **Consoles → Bash**:
-   ```bash
-   cd tir_calculator
-   mkvirtualenv --python=python3.11 tir-venv
-   pip install -r requirements.txt
-   ```
-4. Pestaña **Web → Add a new web app → Manual configuration → Python 3.11**.
-5. En **Virtualenv**, apunta a la ruta de `tir-venv` (ej. `/home/tu_usuario/.virtualenvs/tir-venv`).
-6. Edita el archivo **WSGI configuration file** que te da PythonAnywhere y reemplázalo por:
-   ```python
-   import sys, os
-   path = '/home/tu_usuario/tir_calculator'
-   if path not in sys.path:
-       sys.path.insert(0, path)
-   os.environ['GOOGLE_API_KEY'] = 'tu_clave_real_aqui'
-   os.environ['GEMINI_MODEL'] = 'gemini-2.5-flash'
-   from app import app as application
-   ```
-7. Clic en **Reload** en la pestaña Web. Tu app quedará en `https://tu_usuario.pythonanywhere.com`.
-
-### Opción: Vercel (serverless — más limitada para este tipo de app)
-
-Vercel ejecuta Python como **funciones serverless** (sin servidor persistente),
-lo cual funciona para esta app porque cada request es independiente, pero con
-límites de tiempo de ejecución más estrictos que Render/PythonAnywhere.
-
-1. Instala la CLI: `npm install -g vercel`.
-2. Desde la carpeta del proyecto: `vercel login` y luego `vercel`.
-3. Sigue las instrucciones en pantalla (el archivo `vercel.json` ya está configurado
-   para enrutar todo hacia `api/index.py`, que reexporta la app Flask).
-4. Configura las variables de entorno en el dashboard de Vercel
-   (**Settings → Environment Variables**): `GOOGLE_API_KEY`, `GEMINI_MODEL`.
-5. `vercel --prod` para publicar la versión final.
+Esta versión usa Ollama en `localhost:11434`. Por eso funciona cuando Flask y
+Ollama están ejecutándose en la misma computadora. Un despliegue en Render,
+Vercel o PythonAnywhere no puede acceder al Ollama de tu PC usando `localhost`;
+para publicar el sitio se necesitaría instalar y ejecutar el modelo en el mismo
+servidor o conectar otra API alojada. Esa alternativa podría tener cuotas o
+requerir facturación, así que no forma parte del modo local sin tarjeta.
 
 ---
 
@@ -225,7 +192,7 @@ límites de tiempo de ejecución más estrictos que Render/PythonAnywhere.
   confiable ahí (el propio libro lo advierte en 7.4.1), así que la decisión
   se toma con el **signo del VAN evaluado en la TMAR**, que es matemáticamente
   equivalente y siempre válido.
-- **¿Qué pasa si Gemini interpreta mal una imagen?** El usuario revisa y
+- **¿Qué pasa si Ollama interpreta mal una imagen?** El usuario revisa y
   corrige los montos extraídos en la pestaña "Solución" antes de resolver;
   la IA nunca hace el cálculo final, solo arma la tabla de flujos.
 - **Casos borde manejados:** división por cero evitada en `(1+i)^t`, flujos

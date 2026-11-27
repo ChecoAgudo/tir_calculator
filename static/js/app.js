@@ -94,7 +94,7 @@ function canvasTieneDibujo() {
 }
 
 // ============================================================
-// 4. Analizar problema (texto + imagen y/o canvas -> Gemini)
+// 4. Analizar problema (texto + imagen y/o canvas -> Ollama local)
 // ============================================================
 const btnAnalizar = document.getElementById("btn-analizar");
 const analizarError = document.getElementById("analizar-error");

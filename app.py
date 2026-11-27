@@ -2,7 +2,7 @@
 """
 app.py
 Aplicación Flask: sirve el frontend y expone la API REST que conecta
-Gemini (lectura del problema) con solver.py (cálculo exacto de VAN/TIR).
+Ollama local (lectura del problema) con solver.py (cálculo exacto de VAN/TIR).
 
 Rutas:
   GET  /                  -> interfaz web (SPA de una sola página)
@@ -15,7 +15,7 @@ from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 
 from config import Config
-import gemini_service
+import ollama_service
 import solver
 
 app = Flask(__name__)
@@ -40,19 +40,17 @@ def analizar():
       - multipart/form-data con un archivo 'imagen' (foto o canvas exportado)
         y/o un campo 'texto'
       - o JSON { "texto": "..." }
-    Devuelve el JSON estructurado que Gemini extrajo del enunciado.
+    Devuelve el JSON estructurado que Ollama extrajo del enunciado.
     """
     try:
         texto = None
         imagen_bytes = None
-        mime_type = "image/png"
 
         if request.content_type and "multipart/form-data" in request.content_type:
             texto = request.form.get("texto") or None
             archivo = request.files.get("imagen")
             if archivo and archivo.filename:
                 imagen_bytes = archivo.read()
-                mime_type = archivo.mimetype or "image/png"
         else:
             cuerpo = request.get_json(silent=True) or {}
             texto = cuerpo.get("texto")
@@ -60,9 +58,7 @@ def analizar():
         if not texto and not imagen_bytes:
             return jsonify({"error": "Envía un texto o una imagen para analizar."}), 400
 
-        datos = gemini_service.analizar_problema(
-            texto=texto, imagen_bytes=imagen_bytes, mime_type=mime_type
-        )
+        datos = ollama_service.analizar_problema(texto=texto, imagen_bytes=imagen_bytes)
         return jsonify(datos)
 
     except ValueError as exc:
