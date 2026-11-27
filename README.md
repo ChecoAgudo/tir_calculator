@@ -5,7 +5,7 @@ Unidad 7, Análisis de la Tasa de Rendimiento.
 
 Resuelve problemas de VAN/TIR (simples, mixtos y de análisis incremental
 entre alternativas) a partir de **texto, una foto del enunciado o un
-boceto dibujado a mano**. Gemini (IA de Google) lee el problema y arma la
+boceto dibujado a mano**. Groq lee el problema y arma la
 tabla de flujos de caja; todo el cálculo matemático (VAN, TIR, regla de
 signos de Descartes, análisis incremental) lo hace Python puro con
 NumPy/SciPy — así la IA nunca "inventa" un número final.
@@ -18,7 +18,7 @@ NumPy/SciPy — así la IA nunca "inventa" un número final.
 tir_calculator/
 ├── app.py                # Flask: rutas / API REST
 ├── solver.py              # Motor matemático: VAN, TIR, incremental, gráficos
-├── gemini_service.py       # Integración con Gemini (lee imagen/texto -> JSON)
+├── groq_service.py          # Integración con Groq (lee imagen/texto -> JSON)
 ├── config.py               # Lee variables de entorno (.env)
 ├── requirements.txt
 ├── .env.example             # Plantilla de variables de entorno
@@ -30,7 +30,7 @@ tir_calculator/
 ```
 
 **Flujo de datos:**
-`Imagen/Texto/Canvas → Gemini (extrae flujos de caja en JSON) → el usuario
+`Imagen/Texto/Canvas → Groq (extrae flujos de caja en JSON) → el usuario
 revisa/edita los montos → solver.py calcula VAN/TIR con NumPy/SciPy →
 la interfaz muestra fundamento teórico + pasos + respuesta final + gráficos`.
 
@@ -40,18 +40,24 @@ la interfaz muestra fundamento teórico + pasos + respuesta final + gráficos`.
 
 1. **Python 3.11 o 3.12** instalado (`python3 --version` en una terminal).
 2. **Visual Studio Code** con la extensión oficial **Python** (de Microsoft) instalada.
-3. Una **API Key de Google Gemini** (gratuita, ver paso 3).
-4. Conexión a internet (Gemini y las fuentes/CDN del frontend la necesitan).
+3. Una **API Key de Groq** creada en https://console.groq.com/keys.
+4. Conexión a internet para Groq y para cargar las fuentes/CDN del frontend.
 
 ---
 
-## 3. Obtener tu API Key de Google Gemini
+## 3. Obtener y configurar tu API Key de Groq
 
-1. Entra a **https://aistudio.google.com/app/apikey** con tu cuenta de Google.
-2. Haz clic en **"Create API key"** (Crear clave de API).
-3. Copia la clave generada (empieza con algo como `AIza...`). La necesitarás en el paso 5.
+1. Entra a **https://console.groq.com/keys** y crea una API key.
+2. Copia la clave y guárdala únicamente en el archivo `.env` local; no la pegues
+   en el código, GitHub, capturas ni mensajes.
+3. El proyecto usa `qwen/qwen3.8-27b`, compatible con texto, imágenes y salida
+   JSON según la [documentación de visión de Groq](https://console.groq.com/docs/vision).
 
-> La capa gratuita de Gemini alcanza perfectamente para este proyecto académico.
+> **Importante sobre el costo:** que la cuenta muestre créditos gratuitos no
+> garantiza que cada modelo o cada consulta sea gratuita. La documentación
+> actual de Groq lista precio por tokens para este modelo y lo marca como
+> Preview. Revisa Usage, Limits y Billing en tu consola antes de usarlo; los
+> créditos, límites y acceso dependen de tu cuenta.
 
 ---
 
@@ -93,15 +99,17 @@ cp .env.example .env
 
 ### Edita el archivo `.env`
 
-Abre el archivo `.env` que se acaba de crear y pega tu clave real:
+Abre el archivo `.env` que se acaba de crear y configura:
 
 ```
-GOOGLE_API_KEY=AIzaSy...tu_clave_real_aqui
-GEMINI_MODEL=gemini-2.5-flash
+GROQ_API_KEY=tu_clave_real_de_groq
+GROQ_MODEL=qwen/qwen3.8-27b
 FLASK_SECRET_KEY=cualquier-texto-aleatorio-largo
 ```
 
-**Nunca subas el archivo `.env` a GitHub** (ya está excluido en `.gitignore`).
+Si ya existe `.env`, edítalo y reemplaza las variables antiguas por estas; no
+copies ni publiques la clave en otro lugar. **Nunca subas `.env` a GitHub**
+(está excluido en `.gitignore`).
 
 ---
 
@@ -152,7 +160,11 @@ mismo con el **canvas**: dibuja el diagrama de flujo de caja y presiona el botó
 | Síntoma | Causa probable | Solución |
 |---|---|---|
 | `ModuleNotFoundError: No module named 'flask'` | El entorno virtual no está activado | Vuelve a correr `source venv/bin/activate` (o el de Windows) antes de `python app.py` |
-| Error 422 "No se configuró GOOGLE_API_KEY" | Falta `.env` o la clave está vacía | Revisa que el archivo se llame exactamente `.env` (no `.env.txt`) y que tenga tu clave real |
+| Error 422 "No se configuró GROQ_API_KEY" | Falta `.env` o la clave está vacía | Confirma el nombre `.env` y configura `GROQ_API_KEY`; reinicia Flask después de editarlo |
+| Groq devuelve 401 | Clave incorrecta, revocada o no cargada | Crea/revisa la clave en Groq Console y confirma que no tenga espacios extra |
+| Groq devuelve 403 o indica que el modelo no está disponible | El modelo no está habilitado para la cuenta | Revisa acceso al modelo y la configuración de tu cuenta en Groq Console |
+| Groq devuelve 403 con `error code: 1010` | El filtro de tráfico de Groq/Cloudflare bloqueó la firma del cliente HTTP; no suele ser un error de clave | Usa la integración con el SDK oficial incluida en este proyecto; actualiza dependencias y reinicia. Si sigue, prueba sin VPN/proxy o consulta a soporte de Groq |
+| Groq devuelve 429 | Se alcanzó un límite o la cuota/créditos disponibles | Revisa Usage, Limits y Billing; espera al reinicio del límite o utiliza un modelo habilitado |
 | Error 422 "No se pudo interpretar la respuesta de la IA" | La imagen es borrosa o el enunciado es ambiguo | Prueba con mejor luz/enfoque, o edita los datos extraídos manualmente en la pestaña Solución |
 | `OSError: [Errno 98] Address already in use` | El puerto 5000 ya está ocupado | Cierra el proceso anterior o cambia el puerto en la última línea de `app.py` (`port=5001`) |
 | La página carga pero los gráficos no aparecen | Sin conexión a internet (Chart.js se carga desde un CDN) | Verifica tu conexión; el proyecto necesita acceso a `cdnjs.cloudflare.com` |
@@ -169,8 +181,8 @@ mismo con el **canvas**: dibuja el diagrama de flujo de caja y presiona el botó
    - **Build Command:** `pip install -r requirements.txt`
    - **Start Command:** `gunicorn app:app`
 4. En la sección **Environment**, agrega las variables:
-   - `GOOGLE_API_KEY` = tu clave real
-   - `GEMINI_MODEL` = `gemini-2.5-flash`
+   - `GROQ_API_KEY` = tu clave real (configúrala como variable secreta)
+   - `GROQ_MODEL` = `qwen/qwen3.8-27b`
 5. Clic en **Create Web Service**. Render te dará una URL pública (`https://tir-calculadora.onrender.com`).
 
 ### Opción: PythonAnywhere
@@ -192,8 +204,8 @@ mismo con el **canvas**: dibuja el diagrama de flujo de caja y presiona el botó
    path = '/home/tu_usuario/tir_calculator'
    if path not in sys.path:
        sys.path.insert(0, path)
-   os.environ['GOOGLE_API_KEY'] = 'tu_clave_real_aqui'
-   os.environ['GEMINI_MODEL'] = 'gemini-2.5-flash'
+   os.environ['GROQ_API_KEY'] = 'tu_clave_real_de_groq'
+   os.environ['GROQ_MODEL'] = 'qwen/qwen3.8-27b'
    from app import app as application
    ```
 7. Clic en **Reload** en la pestaña Web. Tu app quedará en `https://tu_usuario.pythonanywhere.com`.
@@ -209,7 +221,7 @@ límites de tiempo de ejecución más estrictos que Render/PythonAnywhere.
 3. Sigue las instrucciones en pantalla (el archivo `vercel.json` ya está configurado
    para enrutar todo hacia `api/index.py`, que reexporta la app Flask).
 4. Configura las variables de entorno en el dashboard de Vercel
-   (**Settings → Environment Variables**): `GOOGLE_API_KEY`, `GEMINI_MODEL`.
+   (**Settings → Environment Variables**): `GROQ_API_KEY`, `GROQ_MODEL`.
 5. `vercel --prod` para publicar la versión final.
 
 ---
@@ -225,7 +237,7 @@ límites de tiempo de ejecución más estrictos que Render/PythonAnywhere.
   confiable ahí (el propio libro lo advierte en 7.4.1), así que la decisión
   se toma con el **signo del VAN evaluado en la TMAR**, que es matemáticamente
   equivalente y siempre válido.
-- **¿Qué pasa si Gemini interpreta mal una imagen?** El usuario revisa y
+- **¿Qué pasa si Groq interpreta mal una imagen?** El usuario revisa y
   corrige los montos extraídos en la pestaña "Solución" antes de resolver;
   la IA nunca hace el cálculo final, solo arma la tabla de flujos.
 - **Casos borde manejados:** división por cero evitada en `(1+i)^t`, flujos

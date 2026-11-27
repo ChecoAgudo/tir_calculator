@@ -2,7 +2,7 @@
 """
 app.py
 Aplicación Flask: sirve el frontend y expone la API REST que conecta
-Gemini (lectura del problema) con solver.py (cálculo exacto de VAN/TIR).
+Groq (lectura del problema) con solver.py (cálculo exacto de VAN/TIR).
 
 Rutas:
   GET  /                  -> interfaz web (SPA de una sola página)
@@ -15,7 +15,7 @@ from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 
 from config import Config
-import gemini_service
+import groq_service
 import solver
 
 app = Flask(__name__)
@@ -40,7 +40,7 @@ def analizar():
       - multipart/form-data con un archivo 'imagen' (foto o canvas exportado)
         y/o un campo 'texto'
       - o JSON { "texto": "..." }
-    Devuelve el JSON estructurado que Gemini extrajo del enunciado.
+    Devuelve el JSON estructurado que Groq extrajo del enunciado.
     """
     try:
         texto = None
@@ -60,7 +60,7 @@ def analizar():
         if not texto and not imagen_bytes:
             return jsonify({"error": "Envía un texto o una imagen para analizar."}), 400
 
-        datos = gemini_service.analizar_problema(
+        datos = groq_service.analizar_problema(
             texto=texto, imagen_bytes=imagen_bytes, mime_type=mime_type
         )
         return jsonify(datos)
