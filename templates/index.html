@@ -4,9 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TIR+ | Calculadora de Tasa Interna de Retorno</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -60,7 +57,7 @@
       <div class="info-cards">
         <article class="info-card">
           <h3>1. Ingresa tus datos</h3>
-          <p>Escribe el flujo neto de cada periodo. Agrega periodos o alternativas según el ejercicio.</p>
+          <p>Ingresa tablas de flujos, repite beneficios en rangos y agrega alternativas sin límite fijo.</p>
         </article>
         <article class="info-card">
           <h3>2. Cálculo local</h3>
@@ -76,7 +73,8 @@
     <section id="tab-resolucion" class="tab-panel">
       <h2>Ingreso de datos</h2>
       <p class="section-subtitle">
-        Ingresa los montos netos por periodo. El periodo 0 suele ser la inversión inicial negativa.
+        Puedes escribir los flujos directamente o usar los asistentes para inversión, flujos repetidos
+        y salvamento. Todos los periodos son regulares: meses o años, según el ejercicio.
       </p>
 
       <div class="analysis-controls">
@@ -84,28 +82,41 @@
           <label for="tipo-analisis">Tipo de ejercicio</label>
           <select id="tipo-analisis">
             <option value="simple">TIR de un proyecto</option>
-            <option value="incremental">Comparar alternativas (incremental)</option>
+            <option value="incremental">Comparar varias alternativas (incremental)</option>
           </select>
         </div>
         <div class="control-field">
-          <label for="input-tmar">TMAR (%) <span class="hint">opcional para TIR individual</span></label>
+          <label for="unidad-periodo">Unidad de cada periodo</label>
+          <select id="unidad-periodo">
+            <option value="anios">Años</option>
+            <option value="meses">Meses</option>
+            <option value="otro">Otra / no especificada</option>
+          </select>
+        </div>
+        <div class="control-field">
+          <label for="input-tmar">TMAR (%) <span class="hint" id="tmar-hint">escribe la tasa anual</span></label>
           <input type="number" id="input-tmar" step="any" placeholder="Ej. 13">
         </div>
       </div>
 
-      <div class="entry-note">
-        Ingresa flujos netos por periodo. Si el ejercicio incluye costos, ingresos,
-        gradientes o valor de salvamento, suma sus efectos en el periodo correspondiente
-        antes de ingresar el monto.
+      <div class="entry-note" role="note">
+        <strong>Cómo leer el enunciado:</strong> el periodo 0 es la inversión y se ingresa negativa.
+        Los periodos siguientes son cobros (positivos) o costos (negativos). Los asistentes permiten
+        repetir un monto en varios periodos y sumar el salvamento al último periodo. La tabla muestra
+        el flujo total que se usará para calcular. Si una alternativa no tiene flujo en un periodo,
+        ingresa 0; no dejes celdas vacías.
       </div>
 
       <div id="proyectos-entrada" class="project-list"></div>
+      <p id="periodos-resumen" class="period-summary"></p>
       <div class="entry-actions">
-        <button class="btn btn--ghost" id="btn-agregar-periodo">Agregar periodo</button>
-        <button class="btn btn--ghost" id="btn-agregar-proyecto" hidden>Agregar alternativa</button>
+        <button class="btn btn--ghost" id="btn-agregar-periodo" type="button">Agregar periodo</button>
+        <button class="btn btn--ghost" id="btn-quitar-periodo" type="button">Quitar último periodo</button>
+        <button class="btn btn--ghost" id="btn-agregar-proyecto" type="button" hidden>Agregar alternativa</button>
       </div>
+      <p class="hint period-hint">Se mantienen los mismos periodos para todas las alternativas. Puedes quitar periodos solo hasta dejar al menos dos.</p>
 
-      <button class="btn btn--primary btn--wide" id="btn-resolver">Resolver ejercicio</button>
+      <button class="btn btn--primary btn--wide" id="btn-resolver" type="button">Resolver ejercicio</button>
       <p id="analizar-error" class="error-msg" hidden></p>
     </section>
 
@@ -141,7 +152,6 @@
     <p>TIR+ · Proyecto académico — Sistemas Económicos, Ing. de Sistemas, UMSS</p>
   </footer>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.3/chart.umd.min.js"></script>
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

@@ -11,24 +11,35 @@ Python y no requiere una API, una clave de IA ni el envío de datos a un modelo.
 - Cálculo del VAN a una TMAR opcional y evaluación de conveniencia.
 - Comparación incremental de dos o más alternativas con una TMAR.
 - Gráficos de los flujos y de la curva VAN/tasa.
-- Periodos y alternativas añadibles desde la interfaz.
+- Periodos y alternativas añadibles desde la interfaz, sin un máximo fijo de proyectos.
+- Asistentes para registrar una inversión, repetir ingresos/costos en un rango de periodos
+  y sumar un valor de salvamento o venta al periodo final.
+- Gráficos dibujados en el navegador, sin CDN ni conexión a internet durante el uso.
 
-Los flujos deben ingresarse como montos netos por periodo. Cuando un problema
-incluya costos, ingresos, gradientes, impuestos o valor de salvamento, calcula
-el flujo neto de cada periodo y suma los conceptos que coincidan en ese periodo
-antes de ingresarlos. El periodo 0 suele ser una inversión negativa. Las tasas
-se interpretan en la unidad de los periodos proporcionados (por ejemplo,
-periodos mensuales producen una TIR mensual).
+El periodo 0 suele ser una inversión negativa. Los ingresos se ingresan positivos
+y los costos negativos. El asistente de flujos repetidos puede reemplazar el flujo
+de un rango o sumarse a los valores existentes cuando coinciden varios conceptos
+en un periodo. El asistente de salvamento suma el valor ingresado al último periodo.
+La tabla siempre muestra el flujo final que usará el motor. También se puede editar
+cualquier celda directamente. Las tasas se interpretan en la unidad de los periodos
+(por ejemplo, periodos mensuales producen una TIR mensual).
+El selector permite indicar años o meses: al trabajar con meses, la TIR también
+se muestra como tasa efectiva anual equivalente y la TMAR ingresada como anual
+se convierte a su equivalente mensual. Si solo se conoce una TMAR por periodo,
+selecciona «Otra / no especificada» para ingresarla directamente.
 
 La aplicación no interpreta enunciados, imágenes ni fórmulas simbólicas: esos
-datos deben traducirse a flujos numéricos en la tabla. El cálculo de VAN/TIR y
-la comparación entre alternativas sí se hacen en el servidor local.
+datos deben traducirse a flujos numéricos. Para inversiones, beneficios uniformes
+y salvamento se pueden usar los asistentes, sin sumar esos conceptos fuera de la
+aplicación. Si el enunciado requiere cálculos financieros previos no implementados
+(por ejemplo, determinar el importe de una cuota o de impuestos), se debe calcular
+ese importe o ingresarlo como un flujo de periodo; el motor resuelve VAN/TIR y la
+comparación incremental localmente.
 
 ## Requisitos
 
 - Python 3.11 o superior.
-- Para mostrar gráficos, conexión a internet para cargar Chart.js desde CDN.
-  La resolución numérica no depende de la conexión ni de ese servicio.
+- No se necesita conexión a internet para ejecutar la aplicación ni ver los gráficos.
 
 ## Instalación y ejecución
 
@@ -54,22 +65,30 @@ Abre <http://localhost:5000> para usar la aplicación.
 
 ## Uso
 
-1. Selecciona TIR individual o comparación incremental.
-2. Introduce el flujo neto para cada periodo, empezando en el periodo 0.
-   Usa «Agregar periodo» cuando el ejercicio tenga más periodos.
-3. Si corresponde, introduce la TMAR como porcentaje (por ejemplo, `13` para
-   13%). El análisis incremental requiere una TMAR.
-4. En modo incremental, agrega una alternativa por proyecto y usa periodos
-   consistentes. Completa los flujos faltantes con cero cuando una alternativa
-   dure menos periodos.
-5. Pulsa «Resolver ejercicio» para consultar los pasos, el resultado y los
+1. Selecciona TIR individual o comparación incremental. En modo incremental
+   aparecen dos alternativas; usa «Agregar alternativa» para añadir más.
+2. Usa el asistente de inversión para escribir el monto positivo; la aplicación
+   lo registra negativo en el periodo 0.
+3. Para un beneficio o costo repetido, especifica los periodos inicial y final
+   y el monto por periodo. Usa «Reemplazar» para llenar el rango o «Sumar» cuando
+   deseas combinarlo con un flujo ya ingresado.
+4. Si hay salvamento o venta, escribe su valor en el asistente correspondiente.
+   Se suma al flujo del último periodo; no lo vuelvas a incluir en la tabla.
+5. Ingresa directamente en la tabla los flujos que varían entre periodos. Usa
+   «Agregar periodo» o «Quitar último periodo» para ajustar la duración. Todas
+   las alternativas mantienen el mismo número de periodos.
+6. Introduce la TMAR como porcentaje (por ejemplo, `13` para 13%). Es obligatoria
+   para el análisis incremental. Con periodos en meses se interpreta como tasa
+   anual y se convierte automáticamente a mensual.
+7. Pulsa «Resolver ejercicio» para consultar los pasos, el resultado y los
    gráficos.
 
 ## Ejemplo
 
-Para los flujos `-1000`, `1000`, `250` en los periodos 0, 1 y 2, respectivamente,
-la solución es aproximadamente `20.71 %` por periodo. Si la TMAR es 10 %, el
-VAN a esa TMAR permite evaluar la conveniencia de la inversión.
+Para una inversión de 1000, un beneficio de 1000 en el periodo 1 y otro de 250
+en el periodo 2, aplica una inversión inicial de `1000` y registra los flujos
+restantes en la tabla. La solución es aproximadamente `20.71 %` por periodo.
+Si la TMAR es 10 %, el VAN a esa TMAR permite evaluar la conveniencia.
 
 ## Pruebas
 

@@ -8,6 +8,14 @@ class ResolverApiTests(unittest.TestCase):
         app.config["TESTING"] = True
         self.client = app.test_client()
 
+    def test_pagina_incluye_controles_y_graficos_sin_cdn(self):
+        respuesta = self.client.get("/")
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn(b'id="btn-quitar-periodo"', respuesta.data)
+        self.assertIn(b'id="unidad-periodo"', respuesta.data)
+        self.assertNotIn(b"chart.umd.js", respuesta.data)
+
     def test_resuelve_tir_y_muestra_calculo_van_a_tmar(self):
         respuesta = self.client.post("/api/resolver", json={
             "tipo_analisis": "simple",
