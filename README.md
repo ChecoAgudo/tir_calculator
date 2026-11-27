@@ -98,6 +98,68 @@ python -m unittest discover -s tests
 
 ## Despliegue
 
-La aplicación es compatible con los archivos de despliegue incluidos para
-Render, Vercel y Gunicorn. No se requieren variables de entorno ni claves de
-proveedores externos.
+La aplicación no requiere variables de entorno ni claves de proveedores externos.
+El archivo `.python-version` fija Python 3.12 para mantener compatibilidad con
+NumPy 1.26.4.
+
+### Render — opción recomendada para un despliegue gratuito
+
+El repositorio incluye `render.yaml` con el plan gratuito, el comando de
+instalación y el comando de inicio.
+
+1. Sube el proyecto a un repositorio de GitHub. Comprueba que `render.yaml`,
+   `.python-version` y `requirements.txt` estén en la raíz.
+2. Crea una cuenta en Render y conecta GitHub.
+3. En el Dashboard selecciona **New → Blueprint** y elige este repositorio y
+   la rama que quieras desplegar.
+4. Render leerá `render.yaml`. Revisa que el servicio `tir-calculadora` muestre
+   el plan **Free** y confirma la aplicación del Blueprint.
+5. Espera a que el despliegue termine y abre la URL `.onrender.com` que Render
+   muestra para el servicio.
+6. Comprueba la página principal y visita `/api/salud`; debe responder
+   `{"estado":"ok"}`.
+
+Si el nombre `tir-calculadora` ya está ocupado en Render, cambia `name` en
+`render.yaml`, sube el cambio y vuelve a aplicar el Blueprint. También puedes
+crear un **Web Service** manualmente usando:
+
+- Root Directory: `.`
+- Build Command: `pip install -r requirements.txt`
+- Start Command: `gunicorn app:app`
+- Instance Type: **Free**
+
+Los servicios gratuitos de Render se duermen después de 15 minutos sin tráfico
+y el siguiente acceso puede tardar alrededor de un minuto en iniciar. El sistema
+de archivos del servicio no es persistente; esta aplicación no guarda ejercicios
+ni necesita una base de datos. El plan gratuito tiene límites de uso que Render
+puede actualizar.
+
+### Vercel
+
+El proyecto ya incluye `vercel.json`, `api/index.py` y `.python-version`. La
+configuración enruta la aplicación Flask a una función Python y sirve los
+archivos de `static/`.
+
+1. Sube el proyecto a GitHub, incluyendo `vercel.json`, `api/index.py`,
+   `templates/`, `static/`, `requirements.txt` y `.python-version`.
+2. Inicia sesión en Vercel y selecciona **Add New → Project**.
+3. Importa el repositorio de GitHub y confirma que **Root Directory** sea la
+   raíz del repositorio.
+4. Deja que Vercel use `vercel.json`; no establezcas un Output Directory ni
+   reemplaces la configuración de builds/rutas del proyecto.
+5. Comprueba que el framework sea **Other** si Vercel solicita elegir uno.
+   No agregues variables de entorno: la aplicación no las necesita.
+6. Pulsa **Deploy**. Cuando termine, abre la URL que Vercel asigna y prueba
+   también `/api/salud`.
+
+Cada `push` a la rama conectada genera un nuevo despliegue. También puedes
+importar el repositorio desde la CLI de Vercel. Si la página carga sin estilos,
+revisa los logs y confirma que el directorio raíz y el `vercel.json` incluidos
+en el despliegue son los de este proyecto.
+
+El plan Hobby de Vercel aparece actualmente como $0/mes en su [página de
+precios](https://vercel.com/pricing); revisa allí las condiciones y límites
+vigentes. Vercel ejecuta Flask como una función serverless, mientras que Render
+mantiene un servicio web que puede dormir cuando está inactivo. Para este
+proyecto, Render suele ser el camino más directo porque el repositorio ya
+contiene un Blueprint gratuito configurado.
