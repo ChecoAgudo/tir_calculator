@@ -1,26 +1,12 @@
 # -*- coding: utf-8 -*-
-"""
-app.py
-Aplicación Flask: sirve el frontend y expone la API REST que conecta
-Gemini (lectura del problema) con solver.py (cálculo exacto de VAN/TIR).
+"""Aplicación Flask para resolver ejercicios de VAN y TIR con datos manuales."""
+from math import isfinite
 
-Rutas:
-  GET  /                  -> interfaz web (SPA de una sola página)
-  POST /api/analizar      -> recibe texto y/o imagen, devuelve JSON extraído
-  POST /api/resolver      -> recibe flujos (extraídos o editados a mano),
-                             devuelve la solución paso a paso + datos de gráficos
-  GET  /api/salud         -> healthcheck simple para plataformas de deploy
-"""
-from flask import Flask, request, jsonify, render_template
-from flask_cors import CORS
+from flask import Flask, jsonify, render_template, request
 
-from config import Config
-import gemini_service
 import solver
 
 app = Flask(__name__)
-app.config.from_object(Config)
-CORS(app)
 
 
 @app.get("/")
@@ -33,155 +19,165 @@ def salud():
     return jsonify({"estado": "ok"})
 
 
-@app.post("/api/analizar")
-def analizar():
-    """
-    Acepta:
-      - multipart/form-data con un archivo 'imagen' (foto o canvas exportado)
-        y/o un campo 'texto'
-      - o JSON { "texto": "..." }
-    Devuelve el JSON estructurado que Gemini extrajo del enunciado.
-    """
-    try:
-        texto = None
-        imagen_bytes = None
-        mime_type = "image/png"
+def _validar_datos(cuerpo):
+    if not isinstance(cuerpo, dict):
+        raise ValueError("Envía los datos del ejercicio en formato JSON.")
 
-        if request.content_type and "multipart/form-data" in request.content_type:
-            texto = request.form.get("texto") or None
-            archivo = request.files.get("imagen")
-            if archivo and archivo.filename:
-                imagen_bytes = archivo.read()
-                mime_type = archivo.mimetype or "image/png"
-        else:
-            cuerpo = request.get_json(silent=True) or {}
-            texto = cuerpo.get("texto")
+    tipo = cuerpo.get("tipo_analisis", "simple")
+    if tipo not in ("simple", "incremental"):
+        raise ValueError("El tipo de análisis debe ser simple o incremental.")
 
-        if not texto and not imagen_bytes:
-            return jsonify({"error": "Envía un texto o una imagen para analizar."}), 400
+    proyectos = cuerpo.get("proyectos")
+    if not isinstance(proyectos, list):
+        raise ValueError("Agrega al menos un proyecto con sus flujos de caja.")
 
-        datos = gemini_service.analizar_problema(
-            texto=texto, imagen_bytes=imagen_bytes, mime_type=mime_type
+    minimo = 2 if tipo == "incremental" else 1
+    if len(proyectos) < minimo:
+        raise ValueError(
+            "El análisis incremental requiere al menos dos alternativas."
+            if tipo == "incremental"
+            else "Agrega un proyecto para resolver."
         )
-        return jsonify(datos)
+    if tipo == "simple" and len(proyectos) != 1:
+        raise ValueError("El análisis simple debe contener un solo proyecto.")
 
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 422
-    except Exception as exc:  # salvaguarda final
-        return jsonify({"error": f"Error inesperado: {exc}"}), 500
+    proyectos_validos = []
+    for indice, proyecto in enumerate(proyectos, start=1):
+        if not isinstance(proyecto, dict):
+            raise ValueError(f"El proyecto {indice} no tiene un formato válido.")
+
+        nombre = str(proyecto.get("nombre") or f"Proyecto {indice}").strip()
+        flujos = proyecto.get("flujos")
+        if not isinstance(flujos, list) or len(flujos) < 2:
+            raise ValueError(
+                f"{nombre} necesita al menos dos periodos de flujo de caja."
+            )
+
+        flujos_validos = []
+        for periodo, monto in enumerate(flujos):
+            if isinstance(monto, bool) or not isinstance(monto, (int, float)):
+                raise ValueError(
+                    f"El monto del periodo {periodo} de {nombre} debe ser numérico."
+                )
+            try:
+                valor = float(monto)
+            except OverflowError as exc:
+                raise ValueError(
+                    f"El monto del periodo {periodo} de {nombre} está fuera de rango."
+                ) from exc
+            if not isfinite(valor):
+                raise ValueError(
+                    f"El monto del periodo {periodo} de {nombre} debe ser finito."
+                )
+            flujos_validos.append(valor)
+
+        if not any(flujos_validos):
+            raise ValueError(f"{nombre} no puede tener todos sus flujos en cero.")
+
+        proyectos_validos.append({"nombre": nombre, "flujos": flujos_validos})
+
+    tmar = cuerpo.get("tmar")
+    if tmar is not None:
+        if isinstance(tmar, bool) or not isinstance(tmar, (int, float)):
+            raise ValueError("La TMAR debe ser un porcentaje numérico.")
+        try:
+            tmar = float(tmar)
+        except OverflowError as exc:
+            raise ValueError("La TMAR está fuera de rango.") from exc
+        if not isfinite(tmar) or tmar <= -1:
+            raise ValueError("La TMAR debe ser mayor que -100%.")
+    if tipo == "incremental" and tmar is None:
+        raise ValueError("El análisis incremental requiere una TMAR.")
+
+    return tipo, proyectos_validos, tmar
 
 
 @app.post("/api/resolver")
 def resolver():
-    """
-    Espera JSON:
-    {
-      "tipo_analisis": "simple" | "incremental",
-      "tmar": 0.13,                 (opcional si tipo_analisis es "simple")
-      "proyectos": [{"nombre": "A", "flujos": [-1000, 1000, 250]}, ...]
-    }
-    Devuelve fundamento teórico, pasos, respuesta final y datos de gráficos.
-    """
+    if not request.is_json:
+        return jsonify({"error": "Envía los datos del ejercicio en formato JSON."}), 400
+
     try:
-        cuerpo = request.get_json(force=True)
-        tipo = cuerpo.get("tipo_analisis", "simple")
-        proyectos = cuerpo.get("proyectos", [])
-        tmar = cuerpo.get("tmar")
+        tipo, proyectos, tmar = _validar_datos(request.get_json(silent=True))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
 
-        if not proyectos:
-            return jsonify({"error": "No se recibió ningún flujo de caja."}), 400
-        for p in proyectos:
-            if not isinstance(p.get("flujos"), list) or len(p["flujos"]) < 2:
-                return jsonify({
-                    "error": f"El proyecto '{p.get('nombre', '?')}' necesita "
-                             f"al menos 2 periodos de flujo de caja."
-                }), 400
+    fundamento = (
+        "La Tasa Interna de Retorno (TIR) es la tasa i que hace que el "
+        "Valor Actual Neto (VAN) sea cero: VAN(i) = Σ CFₜ / (1+i)ᵗ = 0. "
+        "Cada flujo ingresado representa el monto neto de su periodo; suma "
+        "en la tabla cualquier ingreso, costo, gradiente o valor de "
+        "salvamento correspondiente a ese periodo."
+    )
 
-        fundamento = (
-            "La Tasa Interna de Retorno (TIR) es la tasa de interés i que "
-            "hace que el Valor Actual Neto (VAN) del flujo de caja sea "
-            "igual a cero: VAN(i) = Σ CF_t / (1+i)^t = 0. Para inversiones "
-            "simples (un solo cambio de signo) existe una única TIR real "
-            "positiva; para inversiones mixtas puede haber varias, y la "
-            "regla de los signos de Descartes acota cuántas."
-        )
-
-        if tipo == "incremental" and len(proyectos) > 1:
-            if tmar is None:
-                return jsonify({"error": "El análisis incremental requiere una TMAR."}), 400
-
-            detalle_individual = []
-            for p in proyectos:
-                r = solver.encontrar_tir(p["flujos"])
-                detalle_individual.append({
-                    "nombre": p["nombre"],
-                    "flujos": p["flujos"],
-                    "tir": r["tir"],
-                    "clasificacion": r["clasificacion"],
-                    "van_a_tmar": round(solver.van(p["flujos"], tmar), 2),
-                    "grafico_van": solver.curva_van(p["flujos"]),
-                    "grafico_flujo": solver.datos_flujo_caja(p["flujos"]),
-                })
-
-            incremental = solver.analisis_incremental(proyectos, tmar)
-
-            return jsonify({
-                "fundamento_teorico": fundamento,
-                "tipo_analisis": "incremental",
-                "tmar": tmar,
-                "proyectos": detalle_individual,
-                "pasos_incremental": incremental["pasos"],
-                "respuesta_final": (
-                    f"La mejor alternativa según el análisis incremental "
-                    f"(TMAR = {solver.fmt_pct(tmar)}) es: "
-                    f"{incremental['mejor_proyecto']}."
-                ),
+    if tipo == "incremental":
+        detalle_individual = []
+        for proyecto in proyectos:
+            resultado = solver.encontrar_tir(proyecto["flujos"])
+            detalle_individual.append({
+                "nombre": proyecto["nombre"],
+                "flujos": proyecto["flujos"],
+                "tir": resultado["tir"],
+                "clasificacion": resultado["clasificacion"],
+                "van_a_tmar": round(solver.van(proyecto["flujos"], tmar), 2),
+                "pasos": resultado["pasos"] + solver.pasos_van(proyecto["flujos"], tmar),
+                "grafico_van": solver.curva_van(proyecto["flujos"]),
+                "grafico_flujo": solver.datos_flujo_caja(proyecto["flujos"]),
             })
 
-        # --- Caso simple: un solo proyecto ---
-        proy = proyectos[0]
-        resultado = solver.encontrar_tir(proy["flujos"])
-        tasas = resultado["tir"]
-
-        if tasas:
-            if len(tasas) == 1:
-                respuesta_final = f"TIR = {solver.fmt_pct(tasas[0])}."
-            else:
-                respuesta_final = (
-                    "El proyecto tiene TIR múltiple (inversión mixta). "
-                    "Valores candidatos: "
-                    + ", ".join(solver.fmt_pct(t) for t in tasas) + "."
-                )
-            if tmar is not None:
-                mejor = max(tasas, key=lambda t: t) if len(tasas) else None
-                aceptar = mejor is not None and mejor >= tmar
-                respuesta_final += (
-                    f" Comparada con la TMAR ({solver.fmt_pct(tmar)}), la "
-                    f"inversión {'SÍ' if aceptar else 'NO'} es conveniente."
-                )
-        else:
-            respuesta_final = "El proyecto no tiene una TIR real válida."
-
+        incremental = solver.analisis_incremental(proyectos, tmar)
         return jsonify({
             "fundamento_teorico": fundamento,
-            "tipo_analisis": "simple",
+            "tipo_analisis": "incremental",
             "tmar": tmar,
-            "proyecto": {
-                "nombre": proy.get("nombre", "Proyecto"),
-                "flujos": proy["flujos"],
-            },
-            "clasificacion": resultado["clasificacion"],
-            "pasos": resultado["pasos"],
-            "tir": tasas,
-            "respuesta_final": respuesta_final,
-            "graficos": {
-                "curva_van": solver.curva_van(proy["flujos"]),
-                "flujo_caja": solver.datos_flujo_caja(proy["flujos"]),
-            },
+            "proyectos": detalle_individual,
+            "pasos_incremental": incremental["pasos"],
+            "respuesta_final": (
+                f"La mejor alternativa según el análisis incremental "
+                f"(TMAR = {solver.fmt_pct(tmar)}) es: "
+                f"{incremental['mejor_proyecto']}."
+            ),
         })
 
-    except Exception as exc:
-        return jsonify({"error": f"No se pudo resolver el problema: {exc}"}), 500
+    proyecto = proyectos[0]
+    resultado = solver.encontrar_tir(proyecto["flujos"])
+    tasas = resultado["tir"]
+
+    if tasas:
+        respuesta_final = (
+            f"TIR = {solver.fmt_pct(tasas[0])}."
+            if len(tasas) == 1
+            else "El proyecto tiene TIR múltiple. Valores candidatos: "
+            + ", ".join(solver.fmt_pct(tasa) for tasa in tasas) + "."
+        )
+    else:
+        respuesta_final = "El proyecto no tiene una TIR real válida."
+
+    van_a_tmar = None
+    if tmar is not None:
+        van_a_tmar = solver.van(proyecto["flujos"], tmar)
+        resultado["pasos"].extend(solver.pasos_van(proyecto["flujos"], tmar))
+        respuesta_final += (
+            f" A la TMAR ({solver.fmt_pct(tmar)}), el VAN es "
+            f"{solver.fmt_money(van_a_tmar)}; la inversión "
+            f"{'es' if van_a_tmar >= 0 else 'no es'} conveniente."
+        )
+
+    return jsonify({
+        "fundamento_teorico": fundamento,
+        "tipo_analisis": "simple",
+        "tmar": tmar,
+        "proyecto": proyecto,
+        "clasificacion": resultado["clasificacion"],
+        "pasos": resultado["pasos"],
+        "tir": tasas,
+        "van_a_tmar": van_a_tmar,
+        "respuesta_final": respuesta_final,
+        "graficos": {
+            "curva_van": solver.curva_van(proyecto["flujos"]),
+            "flujo_caja": solver.datos_flujo_caja(proyecto["flujos"]),
+        },
+    })
 
 
 if __name__ == "__main__":

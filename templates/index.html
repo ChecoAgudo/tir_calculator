@@ -3,39 +3,35 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TIR+ | Calculadora Inteligente de Tasa Interna de Retorno</title>
+<title>TIR+ | Calculadora de Tasa Interna de Retorno</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-
   <header class="navbar">
     <div class="navbar__brand">
       <span class="navbar__logo">TIR<span class="navbar__logo-plus">+</span></span>
     </div>
-    <nav class="navbar__tabs">
+    <nav class="navbar__tabs" aria-label="Navegación principal">
       <button class="tab-btn is-active" data-tab="inicio">Inicio</button>
-      <button class="tab-btn" data-tab="resolucion">Resolución</button>
+      <button class="tab-btn" data-tab="resolucion">Ingreso de datos</button>
       <button class="tab-btn" data-tab="solucion">Solución</button>
       <button class="tab-btn" data-tab="graficos">Gráficos</button>
     </nav>
   </header>
 
   <main>
-
-    <!-- ========================= TAB: INICIO ========================= -->
     <section id="tab-inicio" class="tab-panel is-active">
       <div class="hero">
         <div class="hero__text">
-          <h1>Calculadora Inteligente<br>de Tasa Interna de Retorno</h1>
+          <h1>Calculadora de<br>Tasa Interna de Retorno</h1>
           <p>
-            La TIR es la tasa de descuento que iguala el VAN de un flujo de
-            caja a cero. Sube la foto de tu ejercicio, dibújalo a mano o
-            escribe el enunciado: la IA construye el flujo de caja y el
-            motor matemático resuelve la TIR paso a paso, con sustento
-            teórico, clasificación de la inversión y gráficos.
+            Ingresa manualmente los flujos de caja de tu ejercicio y obtén
+            la TIR, el VAN y el desarrollo de los cálculos paso a paso.
+            Todo se resuelve en este proyecto, sin servicios de inteligencia
+            artificial ni claves de API.
           </p>
           <button class="btn btn--primary" id="btn-comenzar">Comenzar a resolver</button>
         </div>
@@ -63,76 +59,68 @@
 
       <div class="info-cards">
         <article class="info-card">
-          <h3>1. Lectura inteligente</h3>
-          <p>Gemini interpreta fotos del libro, enunciados escritos o bocetos de diagramas de flujo hechos a mano.</p>
+          <h3>1. Ingresa tus datos</h3>
+          <p>Escribe el flujo neto de cada periodo. Agrega periodos o alternativas según el ejercicio.</p>
         </article>
         <article class="info-card">
-          <h3>2. Cálculo exacto</h3>
-          <p>NumPy y SciPy resuelven el polinomio del VAN: nunca se delega la aritmética a la IA.</p>
+          <h3>2. Cálculo local</h3>
+          <p>El motor matemático calcula VAN y TIR sin enviar tus datos a servicios externos.</p>
         </article>
         <article class="info-card">
-          <h3>3. Desarrollo paso a paso</h3>
-          <p>Fundamento teórico, desarrollo y respuesta final, en el formato que exige la cátedra.</p>
+          <h3>3. Revisa el desarrollo</h3>
+          <p>Consulta la ecuación, los pasos de resolución, la comparación con TMAR y los gráficos.</p>
         </article>
       </div>
     </section>
 
-    <!-- ======================= TAB: RESOLUCIÓN ======================= -->
     <section id="tab-resolucion" class="tab-panel">
       <h2>Ingreso de datos</h2>
-      <p class="section-subtitle">Usa cualquiera de las tres vías. Puedes combinar texto + imagen.</p>
+      <p class="section-subtitle">
+        Ingresa los montos netos por periodo. El periodo 0 suele ser la inversión inicial negativa.
+      </p>
 
-      <div class="input-grid">
-        <div class="input-card">
-          <h3>1. Enunciado / texto</h3>
-          <textarea id="input-texto" rows="9" placeholder="Pega o escribe aquí el enunciado del problema..."></textarea>
+      <div class="analysis-controls">
+        <div class="control-field">
+          <label for="tipo-analisis">Tipo de ejercicio</label>
+          <select id="tipo-analisis">
+            <option value="simple">TIR de un proyecto</option>
+            <option value="incremental">Comparar alternativas (incremental)</option>
+          </select>
         </div>
-
-        <div class="input-card">
-          <h3>2. Adjuntar imagen</h3>
-          <label class="file-drop" for="input-imagen">
-            <span id="file-drop-label">Subir foto del problema</span>
-            <input type="file" id="input-imagen" accept="image/*" hidden>
-          </label>
-          <img id="preview-imagen" class="preview-imagen" hidden>
-        </div>
-
-        <div class="input-card">
-          <h3>3. Entrada manuscrita (canvas)</h3>
-          <canvas id="canvas-dibujo" width="320" height="220"></canvas>
-          <div class="canvas-actions">
-            <button class="btn btn--ghost" id="btn-limpiar-canvas">Limpiar</button>
-          </div>
+        <div class="control-field">
+          <label for="input-tmar">TMAR (%) <span class="hint">opcional para TIR individual</span></label>
+          <input type="number" id="input-tmar" step="any" placeholder="Ej. 13">
         </div>
       </div>
 
-      <div class="form-row">
-        <label for="input-tmar">TMAR (%) <span class="hint">(déjalo vacío si el problema no la especifica)</span></label>
-        <input type="number" id="input-tmar" step="0.01" placeholder="ej. 13">
+      <div class="entry-note">
+        Ingresa flujos netos por periodo. Si el ejercicio incluye costos, ingresos,
+        gradientes o valor de salvamento, suma sus efectos en el periodo correspondiente
+        antes de ingresar el monto.
       </div>
 
-      <button class="btn btn--primary btn--wide" id="btn-analizar">Analizar problema con IA</button>
+      <div id="proyectos-entrada" class="project-list"></div>
+      <div class="entry-actions">
+        <button class="btn btn--ghost" id="btn-agregar-periodo">Agregar periodo</button>
+        <button class="btn btn--ghost" id="btn-agregar-proyecto" hidden>Agregar alternativa</button>
+      </div>
+
+      <button class="btn btn--primary btn--wide" id="btn-resolver">Resolver ejercicio</button>
       <p id="analizar-error" class="error-msg" hidden></p>
     </section>
 
-    <!-- ========================= TAB: SOLUCIÓN ========================= -->
     <section id="tab-solucion" class="tab-panel">
-      <h2>Datos extraídos</h2>
+      <h2>Datos del ejercicio</h2>
       <div id="datos-extraidos" class="card">
-        <p class="empty-state">Todavía no analizaste ningún problema. Ve a la pestaña «Resolución».</p>
-      </div>
-
-      <div class="form-row" id="fila-resolver" hidden>
-        <button class="btn btn--primary" id="btn-resolver">Resolver con estos datos</button>
+        <p class="empty-state">Ingresa los flujos en la pestaña «Ingreso de datos» y resuelve el ejercicio.</p>
       </div>
 
       <h2>Solución detallada</h2>
       <div id="solucion-detallada" class="card">
-        <p class="empty-state">Aquí aparecerá el fundamento teórico, el desarrollo paso a paso y la respuesta final.</p>
+        <p class="empty-state">Aquí aparecerá el fundamento, el desarrollo paso a paso y la respuesta final.</p>
       </div>
     </section>
 
-    <!-- ========================= TAB: GRÁFICOS ========================= -->
     <section id="tab-graficos" class="tab-panel">
       <h2>Visualización gráfica</h2>
       <div class="graficos-grid">
@@ -147,7 +135,6 @@
       </div>
       <p id="graficos-empty" class="empty-state">Resuelve un problema para ver sus gráficos aquí.</p>
     </section>
-
   </main>
 
   <footer class="footer">

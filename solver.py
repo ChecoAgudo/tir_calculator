@@ -31,7 +31,6 @@ tiene TIR múltiple (inversión no simple / mixta).
 """
 from __future__ import annotations
 import numpy as np
-import numpy_financial as npf
 
 
 # --------------------------------------------------------------------------
@@ -39,7 +38,7 @@ import numpy_financial as npf
 # --------------------------------------------------------------------------
 
 def fmt_money(x: float) -> str:
-    return f"${x:,.2f}"
+    return f"-${abs(x):,.2f}" if x < 0 else f"${x:,.2f}"
 
 
 def fmt_pct(x: float) -> str:
@@ -99,13 +98,19 @@ def clasificar_inversion(cashflows: list[float]) -> dict:
     según la regla de signos de Descartes).
     """
     cambios = descartes_cambios_signo(cashflows)
-    if cambios <= 1:
+    if cambios == 0:
         tipo = "simple (pura)"
         explicacion = (
-            "Un solo cambio de signo (inversión seguida solo de ingresos): "
-            "por la regla de los signos de Descartes existe exactamente "
-            "una raíz real positiva, es decir, una única TIR económica "
-            "válida."
+            "El flujo no cambia de signo. Por la regla de los signos de "
+            "Descartes no hay raíces positivas del polinomio, por lo que "
+            "no existe una TIR económica válida."
+        )
+    elif cambios == 1:
+        tipo = "simple (pura)"
+        explicacion = (
+            "Hay un solo cambio de signo. Por la regla de los signos de "
+            "Descartes puede existir como máximo una raíz real positiva; "
+            "el cálculo verifica si esa TIR económica existe."
         )
     else:
         tipo = "mixta (no simple / compleja)"
@@ -133,6 +138,8 @@ def _raices_polinomio(cashflows: list[float]) -> list[float]:
     Resuelve CF_0*x^n + CF_1*x^(n-1) + ... + CF_n = 0 y devuelve las
     tasas i = x - 1 correspondientes a raíces reales con x > 0.
     """
+    if not any(cashflows):
+        return []
     coeffs = np.array(cashflows, dtype=float)
     # numpy.roots exige que el primer coeficiente no sea cero
     while len(coeffs) > 1 and coeffs[0] == 0:
@@ -181,7 +188,8 @@ def encontrar_tir(cashflows: list[float]) -> dict:
             "titulo": "3. Ecuación cuadrática (a·x² + b·x + c = 0)",
             "contenido": (
                 f"a = {fmt_money(a)}, b = {fmt_money(b)}, c = {fmt_money(c)}  →  "
-                f"Discriminante = b² − 4ac = {b ** 2:,.2f} − {4*a*c:,.2f} = {disc:,.4f}"
+                f"Discriminante = b² − 4ac = {b ** 2:,.2f} − "
+                f"({4*a*c:,.2f}) = {disc:,.4f}"
             ),
         })
         if disc >= 0:
@@ -214,6 +222,18 @@ def encontrar_tir(cashflows: list[float]) -> dict:
             "titulo": "5. Filtrar raíces válidas (x = 1+i > 0)",
             "contenido": "Tasas candidatas: " + ", ".join(fmt_pct(t) for t in tasas),
         })
+        comprobaciones = []
+        for tasa in tasas:
+            x = 1 + tasa
+            valor_van = van(cashflows, tasa)
+            comprobaciones.append(
+                f"x = 1 + {tasa:.8f} = {x:.8f}; "
+                f"VAN({fmt_pct(tasa)}) = {fmt_money(valor_van)}"
+            )
+        pasos.append({
+            "titulo": "6. Verificar las tasas encontradas",
+            "contenido": " | ".join(comprobaciones),
+        })
     else:
         pasos.append({
             "titulo": "5. Filtrar raíces válidas (x = 1+i > 0)",
@@ -226,16 +246,6 @@ def encontrar_tir(cashflows: list[float]) -> dict:
         "clasificacion": clasificacion,
         "pasos": pasos,
     }
-
-
-def tir_numpy_financial(cashflows: list[float]) -> float | None:
-    """TIR 'de referencia' usando numpy_financial (una sola raíz), útil
-    para verificación cruzada rápida."""
-    try:
-        r = npf.irr(cashflows)
-        return None if (r is None or np.isnan(r)) else float(r)
-    except Exception:
-        return None
 
 
 # --------------------------------------------------------------------------
@@ -316,6 +326,7 @@ def analisis_incremental(proyectos: list[dict], tmar: float) -> dict:
                 f"{nota_tir}  →  "
                 f"{'la inversión adicional se justifica, ' + proy['nombre'] + ' pasa a ser la base' if gana_mayor else base['nombre'] + ' se mantiene como mejor opción'}."
             ),
+            "detalle_van": pasos_van(incremento, tmar),
         })
         if gana_mayor:
             base = {"nombre": proy["nombre"], "flujos": flujo}

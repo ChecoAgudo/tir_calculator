@@ -133,57 +133,58 @@ main { max-width: 1080px; margin: 0 auto; padding: 36px 32px 80px; }
 /* ---------------------------------------------------------------- */
 /* Resolución: grid de entradas                                       */
 /* ---------------------------------------------------------------- */
-.input-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-}
-.input-card {
-  background: var(--c-white);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-md);
-  padding: 18px;
-}
-.input-card h3 { font-size: 0.92rem; color: var(--c-navy); }
-textarea, input[type="number"], input[type="text"] {
+input[type="number"], input[type="text"], select {
   width: 100%;
   font-family: var(--font-body);
   font-size: 0.9rem;
   border: 1px solid var(--c-border);
   border-radius: var(--radius-sm);
   padding: 10px;
-  resize: vertical;
 }
-.file-drop {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 140px;
-  border: 1.5px dashed var(--c-border);
-  border-radius: var(--radius-sm);
-  color: var(--c-ink-soft);
-  font-size: 0.88rem;
-  cursor: pointer;
-  text-align: center;
-  padding: 10px;
+.analysis-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  max-width: 720px;
 }
-.file-drop:hover { border-color: var(--c-blue); color: var(--c-blue); }
-.preview-imagen { width: 100%; margin-top: 10px; border-radius: var(--radius-sm); }
-
-#canvas-dibujo {
-  width: 100%;
-  height: 140px;
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-sm);
-  touch-action: none;
-  background: var(--c-white);
+.control-field label, .project-heading label {
+  display: block;
+  color: var(--c-navy);
+  font-size: 0.9rem;
+  font-weight: 600;
 }
-.canvas-actions { margin-top: 8px; display: flex; justify-content: flex-end; }
-
-.form-row { margin-top: 20px; display: flex; align-items: center; gap: 12px; }
-.form-row label { font-weight: 600; font-size: 0.9rem; color: var(--c-navy); }
-.form-row input[type="number"] { width: 120px; }
+.control-field input, .control-field select, .project-heading input { margin-top: 8px; }
 .hint { font-weight: 400; color: var(--c-ink-soft); font-size: 0.8rem; }
+
+.entry-note {
+  margin: 20px 0;
+  padding: 14px 16px;
+  border-left: 3px solid var(--c-blue);
+  border-radius: var(--radius-sm);
+  background: var(--c-blue-tint);
+  color: var(--c-ink-soft);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.project-list { display: grid; gap: 16px; }
+.project-card {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+}
+.project-heading {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.project-heading label { flex: 1; }
+.entry-actions { display: flex; gap: 10px; margin-top: 16px; }
+.btn--remove { padding: 9px 14px; color: var(--c-danger); }
+.table-scroll { overflow-x: auto; }
+.table-scroll .datos-tabla { min-width: 420px; }
+.table-scroll .datos-tabla input { min-width: 105px; }
 
 .error-msg {
   margin-top: 14px;
@@ -259,6 +260,6 @@ textarea, input[type="number"], input[type="text"] {
 /* ---------------------------------------------------------------- */
 @media (max-width: 860px) {
   .hero { grid-template-columns: 1fr; }
-  .info-cards, .input-grid, .graficos-grid { grid-template-columns: 1fr; }
+  .info-cards, .graficos-grid, .analysis-controls { grid-template-columns: 1fr; }
   .navbar { flex-direction: column; gap: 10px; padding: 14px; }
 }

@@ -1,17 +1,21 @@
 // ============================================================
-// app.js — lógica del frontend de TIR+
+// app.js — ingreso manual y presentación de soluciones de TIR+
 // ============================================================
 
-// ---------- Estado global ----------
-let ultimoAnalisis = null;   // JSON devuelto por /api/analizar (editable)
 let chartFlujo = null;
 let chartVan = null;
+let proyectos = [{ nombre: "Proyecto A", flujos: ["", ""] }];
 
-// ============================================================
-// 1. Navegación por pestañas
-// ============================================================
 const tabButtons = document.querySelectorAll(".tab-btn");
 const tabPanels = document.querySelectorAll(".tab-panel");
+const tipoAnalisis = document.getElementById("tipo-analisis");
+const inputTmar = document.getElementById("input-tmar");
+const listaProyectos = document.getElementById("proyectos-entrada");
+const btnAgregarProyecto = document.getElementById("btn-agregar-proyecto");
+const btnResolver = document.getElementById("btn-resolver");
+const errorEntrada = document.getElementById("analizar-error");
+const contenedorDatos = document.getElementById("datos-extraidos");
+const contenedorSolucion = document.getElementById("solucion-detallada");
 
 function irA(nombreTab) {
   tabButtons.forEach(b => b.classList.toggle("is-active", b.dataset.tab === nombreTab));
@@ -21,262 +25,242 @@ function irA(nombreTab) {
 tabButtons.forEach(btn => btn.addEventListener("click", () => irA(btn.dataset.tab)));
 document.getElementById("btn-comenzar").addEventListener("click", () => irA("resolucion"));
 
-// ============================================================
-// 2. Subida de imagen (preview)
-// ============================================================
-const inputImagen = document.getElementById("input-imagen");
-const previewImagen = document.getElementById("preview-imagen");
-const fileDropLabel = document.getElementById("file-drop-label");
-
-inputImagen.addEventListener("change", () => {
-  const archivo = inputImagen.files[0];
-  if (!archivo) return;
-  fileDropLabel.textContent = archivo.name;
-  const lector = new FileReader();
-  lector.onload = e => {
-    previewImagen.src = e.target.result;
-    previewImagen.hidden = false;
-  };
-  lector.readAsDataURL(archivo);
-});
-
-// ============================================================
-// 3. Canvas de entrada manuscrita
-// ============================================================
-const canvas = document.getElementById("canvas-dibujo");
-const ctx = canvas.getContext("2d");
-let dibujando = false;
-
-function posicionRelativa(evt) {
-  const rect = canvas.getBoundingClientRect();
-  const escalaX = canvas.width / rect.width;
-  const escalaY = canvas.height / rect.height;
-  const punto = evt.touches ? evt.touches[0] : evt;
-  return {
-    x: (punto.clientX - rect.left) * escalaX,
-    y: (punto.clientY - rect.top) * escalaY,
-  };
+function escaparHtml(valor) {
+  return String(valor).replace(/[&<>"']/g, caracter => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[caracter]);
 }
 
-function iniciarTrazo(evt) {
-  dibujando = true;
-  const { x, y } = posicionRelativa(evt);
-  ctx.beginPath();
-  ctx.moveTo(x, y);
-  evt.preventDefault();
+function renderProyectos() {
+  const periodos = proyectos[0].flujos.length;
+  listaProyectos.innerHTML = proyectos.map((proyecto, indice) => `
+    <article class="project-card" data-project="${indice}">
+      <div class="project-heading">
+        <label>
+          <span>Nombre de la alternativa</span>
+          <input type="text" data-project-name="${indice}" value="${escaparHtml(proyecto.nombre)}" maxlength="60">
+        </label>
+        ${indice > 0 ? `<button class="btn btn--ghost btn--remove" data-remove-project="${indice}" type="button">Quitar</button>` : ""}
+      </div>
+      <div class="table-scroll">
+        <table class="datos-tabla">
+          <thead><tr><th>Periodo</th>${Array.from({ length: periodos }, (_, periodo) =>
+            `<th>${periodo === 0 ? "0 (inicial)" : periodo}</th>`).join("")}</tr></thead>
+          <tbody><tr><th>Flujo neto</th>${proyecto.flujos.map((monto, periodo) => `
+            <td><input type="number" step="any" data-project="${indice}" data-period="${periodo}"
+              aria-label="${escaparHtml(proyecto.nombre)}, periodo ${periodo}"
+              placeholder="${periodo === 0 ? "Ej. -1000" : "Ej. 500"}" value="${escaparHtml(monto)}"></td>
+          `).join("")}</tr></tbody>
+        </table>
+      </div>
+    </article>
+  `).join("");
+  btnAgregarProyecto.hidden = tipoAnalisis.value !== "incremental";
 }
-function continuarTrazo(evt) {
-  if (!dibujando) return;
-  const { x, y } = posicionRelativa(evt);
-  ctx.lineWidth = 2;
-  ctx.lineCap = "round";
-  ctx.strokeStyle = "#0B1F3A";
-  ctx.lineTo(x, y);
-  ctx.stroke();
-  evt.preventDefault();
-}
-function terminarTrazo() { dibujando = false; }
 
-["mousedown", "touchstart"].forEach(ev => canvas.addEventListener(ev, iniciarTrazo));
-["mousemove", "touchmove"].forEach(ev => canvas.addEventListener(ev, continuarTrazo));
-["mouseup", "mouseleave", "touchend"].forEach(ev => canvas.addEventListener(ev, terminarTrazo));
-
-document.getElementById("btn-limpiar-canvas").addEventListener("click", () => {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-});
-
-function canvasTieneDibujo() {
-  const datos = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-  for (let i = 3; i < datos.length; i += 4) {
-    if (datos[i] !== 0) return true;
+tipoAnalisis.addEventListener("change", () => {
+  proyectos = proyectos.slice(0, 1);
+  if (tipoAnalisis.value === "incremental") {
+    proyectos.push({ nombre: "Proyecto B", flujos: proyectos[0].flujos.map(() => "") });
   }
-  return false;
+  renderProyectos();
+});
+
+document.getElementById("btn-agregar-periodo").addEventListener("click", () => {
+  proyectos.forEach(proyecto => proyecto.flujos.push(""));
+  renderProyectos();
+});
+
+btnAgregarProyecto.addEventListener("click", () => {
+  const letra = String.fromCharCode(65 + proyectos.length);
+  proyectos.push({ nombre: `Proyecto ${letra}`, flujos: proyectos[0].flujos.map(() => "") });
+  renderProyectos();
+});
+
+listaProyectos.addEventListener("input", evento => {
+  const campoNombre = evento.target.closest("[data-project-name]");
+  if (campoNombre) {
+    proyectos[Number(campoNombre.dataset.projectName)].nombre = campoNombre.value;
+    return;
+  }
+  const campoFlujo = evento.target.closest("[data-project][data-period]");
+  if (campoFlujo) {
+    proyectos[Number(campoFlujo.dataset.project)].flujos[Number(campoFlujo.dataset.period)] = campoFlujo.value;
+  }
+});
+
+listaProyectos.addEventListener("click", evento => {
+  const boton = evento.target.closest("[data-remove-project]");
+  if (!boton) return;
+  proyectos.splice(Number(boton.dataset.removeProject), 1);
+  renderProyectos();
+});
+
+function mostrarError(elemento, mensaje) {
+  elemento.textContent = mensaje;
+  elemento.hidden = false;
 }
 
-// ============================================================
-// 4. Analizar problema (texto + imagen y/o canvas -> Gemini)
-// ============================================================
-const btnAnalizar = document.getElementById("btn-analizar");
-const analizarError = document.getElementById("analizar-error");
+function obtenerDatosEntrada() {
+  const proyectosNormalizados = proyectos.map((proyecto, indice) => {
+    const nombre = proyecto.nombre.trim() || `Proyecto ${indice + 1}`;
+    const flujos = proyecto.flujos.map((monto, periodo) => {
+      if (String(monto).trim() === "") {
+        throw new Error(`Ingresa el flujo del periodo ${periodo} en ${nombre}.`);
+      }
+      const valor = Number(monto);
+      if (!Number.isFinite(valor)) {
+        throw new Error(`El flujo del periodo ${periodo} en ${nombre} no es válido.`);
+      }
+      return valor;
+    });
+    return { nombre, flujos };
+  });
 
-btnAnalizar.addEventListener("click", async () => {
-  analizarError.hidden = true;
-  const texto = document.getElementById("input-texto").value.trim();
-  const archivoImagen = inputImagen.files[0];
-  const hayDibujo = canvasTieneDibujo();
+  const tmarTexto = inputTmar.value.trim();
+  const tmar = tmarTexto === "" ? null : Number(tmarTexto) / 100;
+  if (tmar !== null && !Number.isFinite(tmar)) {
+    throw new Error("Ingresa un porcentaje TMAR válido.");
+  }
 
-  if (!texto && !archivoImagen && !hayDibujo) {
-    mostrarError(analizarError, "Escribe un enunciado, sube una imagen o dibuja el problema antes de analizar.");
+  return {
+    tipo_analisis: tipoAnalisis.value,
+    tmar,
+    proyectos: proyectosNormalizados,
+  };
+}
+
+btnResolver.addEventListener("click", async () => {
+  errorEntrada.hidden = true;
+  let datos;
+  try {
+    datos = obtenerDatosEntrada();
+  } catch (error) {
+    mostrarError(errorEntrada, error.message);
     return;
   }
 
-  btnAnalizar.disabled = true;
-  btnAnalizar.textContent = "Analizando con IA...";
-
+  btnResolver.disabled = true;
+  btnResolver.textContent = "Resolviendo...";
   try {
-    const formData = new FormData();
-    if (texto) formData.append("texto", texto);
-
-    if (archivoImagen) {
-      formData.append("imagen", archivoImagen);
-    } else if (hayDibujo) {
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
-      formData.append("imagen", blob, "boceto.png");
-    }
-
-    const resp = await fetch("/api/analizar", { method: "POST", body: formData });
-    const datos = await resp.json();
-
-    if (!resp.ok) {
-      mostrarError(analizarError, datos.error || "No se pudo analizar el problema.");
-      return;
-    }
-
-    ultimoAnalisis = datos;
-    renderDatosExtraidos(datos);
-    irA("solucion");
-  } catch (err) {
-    mostrarError(analizarError, "Error de conexión con el servidor: " + err.message);
-  } finally {
-    btnAnalizar.disabled = false;
-    btnAnalizar.textContent = "Analizar problema con IA";
-  }
-});
-
-function mostrarError(el, mensaje) {
-  el.textContent = mensaje;
-  el.hidden = false;
-}
-
-// ============================================================
-// 5. Mostrar datos extraídos (editables) antes de resolver
-// ============================================================
-const contenedorDatos = document.getElementById("datos-extraidos");
-const filaResolver = document.getElementById("fila-resolver");
-
-function renderDatosExtraidos(datos) {
-  const tmarManual = document.getElementById("input-tmar").value;
-  const tmar = datos.tmar ?? (tmarManual ? parseFloat(tmarManual) / 100 : null);
-
-  let html = `<p><strong>Resumen:</strong> ${datos.enunciado_resumen || "—"}</p>`;
-  html += `<p><span class="badge">${datos.tipo_analisis === "incremental" ? "Análisis incremental" : "Análisis simple"}</span>`;
-  if (tmar !== null) html += ` <span class="badge">TMAR: ${(tmar * 100).toFixed(2)} %</span>`;
-  html += `</p>`;
-
-  datos.proyectos.forEach((proy, idxProy) => {
-    html += `<h3>Proyecto ${proy.nombre}</h3>`;
-    html += `<table class="datos-tabla"><thead><tr><th>Periodo</th><th>Monto</th></tr></thead><tbody>`;
-    proy.flujos.forEach((monto, t) => {
-      html += `<tr><td>${t}</td><td><input type="number" step="0.01" data-proy="${idxProy}" data-t="${t}" value="${monto}"></td></tr>`;
-    });
-    html += `</tbody></table>`;
-  });
-
-  contenedorDatos.innerHTML = html;
-  filaResolver.hidden = false;
-
-  // sincroniza ediciones manuales con el objeto ultimoAnalisis
-  contenedorDatos.querySelectorAll("input[data-proy]").forEach(inp => {
-    inp.addEventListener("change", () => {
-      const p = parseInt(inp.dataset.proy, 10);
-      const t = parseInt(inp.dataset.t, 10);
-      ultimoAnalisis.proyectos[p].flujos[t] = parseFloat(inp.value) || 0;
-    });
-  });
-
-  if (tmar !== null) ultimoAnalisis.tmar = tmar;
-}
-
-// ============================================================
-// 6. Resolver (llama a /api/resolver con los datos confirmados)
-// ============================================================
-document.getElementById("btn-resolver").addEventListener("click", async () => {
-  if (!ultimoAnalisis) return;
-  const btn = document.getElementById("btn-resolver");
-  btn.disabled = true;
-  btn.textContent = "Resolviendo...";
-
-  try {
-    const resp = await fetch("/api/resolver", {
+    const respuesta = await fetch("/api/resolver", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(ultimoAnalisis),
+      body: JSON.stringify(datos),
     });
-    const resultado = await resp.json();
-
-    if (!resp.ok) {
-      renderErrorSolucion(resultado.error || "No se pudo resolver el problema.");
+    const resultado = await respuesta.json();
+    if (!respuesta.ok) {
+      mostrarError(errorEntrada, resultado.error || "No se pudo resolver el ejercicio.");
       return;
     }
 
+    renderDatos(datos);
     renderSolucion(resultado);
     renderGraficos(resultado);
-  } catch (err) {
-    renderErrorSolucion("Error de conexión: " + err.message);
+    irA("solucion");
+  } catch (error) {
+    mostrarError(errorEntrada, `Error de conexión con el servidor: ${error.message}`);
   } finally {
-    btn.disabled = false;
-    btn.textContent = "Resolver con estos datos";
+    btnResolver.disabled = false;
+    btnResolver.textContent = "Resolver ejercicio";
   }
 });
 
-const contenedorSolucion = document.getElementById("solucion-detallada");
+function renderDatos(datos) {
+  const proyectosHtml = datos.proyectos.map(proyecto => `
+    <h3>${escaparHtml(proyecto.nombre)}</h3>
+    <div class="table-scroll"><table class="datos-tabla">
+      <thead><tr><th>Periodo</th>${proyecto.flujos.map((_, periodo) =>
+        `<th>${periodo}</th>`).join("")}</tr></thead>
+      <tbody><tr><th>Flujo neto</th>${proyecto.flujos.map(monto =>
+        `<td>${escaparHtml(monto)}</td>`).join("")}</tr></tbody>
+    </table></div>
+  `).join("");
+  const tipo = datos.tipo_analisis === "incremental" ? "Análisis incremental" : "TIR individual";
+  const tmar = datos.tmar === null ? "" : `<span class="badge">TMAR: ${(datos.tmar * 100).toFixed(2)} %</span>`;
+  contenedorDatos.innerHTML = `<p><span class="badge">${tipo}</span> ${tmar}</p>${proyectosHtml}`;
+}
 
 function renderErrorSolucion(mensaje) {
-  contenedorSolucion.innerHTML = `<p class="error-msg" style="margin:0">${mensaje}</p>`;
+  contenedorSolucion.textContent = mensaje;
+}
+
+function renderPasos(pasos) {
+  return pasos.map(paso => `
+    <div class="paso">
+      <h4>${escaparHtml(paso.titulo)}</h4>
+      <p>${escaparHtml(paso.contenido)}</p>
+    </div>
+  `).join("");
 }
 
 function renderSolucion(resultado) {
-  let html = `<h3>Fundamento teórico</h3><p>${resultado.fundamento_teorico}</p>`;
+  let html = `<h3>Fundamento teórico</h3><p>${escaparHtml(resultado.fundamento_teorico)}</p>`;
 
   if (resultado.tipo_analisis === "incremental") {
-    resultado.proyectos.forEach(p => {
-      html += `<h3>Proyecto ${p.nombre}</h3>`;
-      html += `<p><span class="badge ${p.clasificacion.cambios_signo > 1 ? 'badge--mixta' : ''}">${p.clasificacion.tipo}</span> `;
-      html += `TIR: ${p.tir.length ? p.tir.map(t => (t * 100).toFixed(2) + "%").join(", ") : "N/D"}</p>`;
+    resultado.proyectos.forEach(proyecto => {
+      const nombre = escaparHtml(proyecto.nombre);
+      const tasas = proyecto.tir.length
+        ? proyecto.tir.map(tasa => `${(tasa * 100).toFixed(2)}%`).join(", ")
+        : "N/D";
+      html += `<h3>${nombre}</h3>`;
+      html += `<p><span class="badge ${proyecto.clasificacion.cambios_signo > 1 ? "badge--mixta" : ""}">`;
+      html += `${escaparHtml(proyecto.clasificacion.tipo)}</span> TIR: ${tasas}; `;
+      html += `VAN a TMAR: ${Number(proyecto.van_a_tmar).toFixed(2)}</p>`;
+      html += `<h4>Desarrollo de ${nombre}</h4>${renderPasos(proyecto.pasos)}`;
     });
-    html += `<h3>Desarrollo del análisis incremental</h3>`;
+    html += "<h3>Desarrollo del análisis incremental</h3>";
     resultado.pasos_incremental.forEach(paso => {
-      html += `<div class="paso"><h4>${paso.titulo}</h4><p>${paso.contenido}</p></div>`;
+      html += renderPasos([paso]);
+      if (paso.detalle_van) html += renderPasos(paso.detalle_van);
     });
   } else {
-    html += `<h3>Clasificación de la inversión</h3>`;
-    html += `<p><span class="badge ${resultado.clasificacion.cambios_signo > 1 ? 'badge--mixta' : ''}">${resultado.clasificacion.tipo}</span></p>`;
-    html += `<p>${resultado.clasificacion.explicacion}</p>`;
-    html += `<h3>Desarrollo paso a paso</h3>`;
-    resultado.pasos.forEach(paso => {
-      html += `<div class="paso"><h4>${paso.titulo}</h4><p>${paso.contenido}</p></div>`;
-    });
+    html += "<h3>Clasificación de la inversión</h3>";
+    html += `<p><span class="badge ${resultado.clasificacion.cambios_signo > 1 ? "badge--mixta" : ""}">`;
+    html += `${escaparHtml(resultado.clasificacion.tipo)}</span></p>`;
+    html += `<p>${escaparHtml(resultado.clasificacion.explicacion)}</p>`;
+    html += "<h3>Desarrollo paso a paso</h3>";
+    html += renderPasos(resultado.pasos);
   }
 
-  html += `<div class="respuesta-final">${resultado.respuesta_final}</div>`;
+  html += `<div class="respuesta-final">${escaparHtml(resultado.respuesta_final)}</div>`;
   contenedorSolucion.innerHTML = html;
 }
 
-// ============================================================
-// 7. Gráficos (Chart.js)
-// ============================================================
 function renderGraficos(resultado) {
-  document.getElementById("graficos-empty").hidden = true;
+  const empty = document.getElementById("graficos-empty");
+  empty.hidden = false;
 
-  let flujoCaja, curvaVan;
-  if (resultado.tipo_analisis === "incremental") {
-    flujoCaja = resultado.proyectos[0].grafico_flujo;
-    curvaVan = resultado.proyectos[0].grafico_van;
-  } else {
-    flujoCaja = resultado.graficos.flujo_caja;
-    curvaVan = resultado.graficos.curva_van;
+  if (typeof Chart === "undefined") {
+    empty.textContent = "Los gráficos requieren conexión para cargar Chart.js. La solución numérica está disponible.";
+    return;
   }
+  empty.hidden = true;
+
+  const proyecto = resultado.tipo_analisis === "incremental"
+    ? resultado.proyectos[0]
+    : resultado.graficos;
+  const flujoCaja = resultado.tipo_analisis === "incremental"
+    ? proyecto.grafico_flujo
+    : proyecto.flujo_caja;
+  const curvaVan = resultado.tipo_analisis === "incremental"
+    ? proyecto.grafico_van
+    : proyecto.curva_van;
 
   const ctxFlujo = document.getElementById("chart-flujo").getContext("2d");
   if (chartFlujo) chartFlujo.destroy();
   chartFlujo = new Chart(ctxFlujo, {
     type: "bar",
     data: {
-      labels: flujoCaja.map(d => `t${d.periodo}`),
+      labels: flujoCaja.map(dato => `t${dato.periodo}`),
       datasets: [{
         label: "Monto",
-        data: flujoCaja.map(d => d.monto),
-        backgroundColor: flujoCaja.map(d => d.monto < 0 ? "#C23B3B" : "#2F6FED"),
+        data: flujoCaja.map(dato => dato.monto),
+        backgroundColor: flujoCaja.map(dato => dato.monto < 0 ? "#C23B3B" : "#2F6FED"),
         borderRadius: 4,
       }],
     },
@@ -288,10 +272,10 @@ function renderGraficos(resultado) {
   chartVan = new Chart(ctxVan, {
     type: "line",
     data: {
-      labels: curvaVan.map(d => (d.tasa * 100).toFixed(0) + "%"),
+      labels: curvaVan.map(dato => `${(dato.tasa * 100).toFixed(0)}%`),
       datasets: [{
         label: "VAN",
-        data: curvaVan.map(d => d.van),
+        data: curvaVan.map(dato => dato.van),
         borderColor: "#2F6FED",
         backgroundColor: "rgba(47,111,237,0.12)",
         fill: true,
@@ -306,3 +290,5 @@ function renderGraficos(resultado) {
     },
   });
 }
+
+renderProyectos();
